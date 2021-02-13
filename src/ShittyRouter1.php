@@ -4,7 +4,7 @@ declare(strict_types = 1);
 class ShittyRouter1
 {
 
-    private const ROUTE_INDEX_METHOD = 0;
+    private const ROUTE_INDEX_METHODS = 0;
 
     private const ROUTE_INDEX_REX = 1;
 
@@ -38,21 +38,15 @@ class ShittyRouter1
         } else {
             throw new \InvalidArgumentException("methods must be array or | separated string");
         }
+        if (empty($methods)) {
+            throw new \InvalidArgumentException("empty methods");
+        }
         $rex = '#^' . $rex . '$#';
-
-        foreach ($methods as $index => $method) {
-            if (empty($method)) {
-                throw new \InvalidArgumentException("empty method in {$index}");
-            }
-            if (! is_string($method)) {
-                throw new \InvalidArgumentException("all methods must be string..");
-            }
-            $this->routes[] = [
-                self::ROUTE_INDEX_METHOD => $method,
+        $this->routes[] = [
+                self::ROUTE_INDEX_METHODS => $methods,
                 self::ROUTE_INDEX_REX => $rex,
                 self::ROUTE_INDEX_CALLBACK => $cb
-            ];
-        }
+        ];
     }
 
     public function set404(callable $cb): void
@@ -84,7 +78,7 @@ class ShittyRouter1
         $requestMethod = $this->getRequestMethod();
         $matches = [];
         foreach ($this->routes as $route) {
-            if ($route[self::ROUTE_INDEX_METHOD] !== $requestMethod) {
+            if (!in_array($requestMethod, $route[self::ROUTE_INDEX_METHODS], true)) {
                 continue;
             }
             if (preg_match($route[self::ROUTE_INDEX_REX], $requestUri, $matches)) {
