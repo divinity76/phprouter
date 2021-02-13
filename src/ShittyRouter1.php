@@ -38,7 +38,7 @@ class ShittyRouter1
         } else {
             throw new \InvalidArgumentException("methods must be array or | separated string");
         }
-        $rex = '@^' . $rex . '$@';
+        $rex = '#^' . $rex . '$#';
 
         foreach ($methods as $index => $method) {
             if (empty($method)) {
