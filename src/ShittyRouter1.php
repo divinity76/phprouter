@@ -30,6 +30,12 @@ class ShittyRouter1
 
     public function match($methods, string $rex, callable $cb): void
     {
+        $rex = '#^' . $rex . '$#';
+        $this->matchRawRex($methods, $rex, $cb);
+    }
+
+    public function matchRawRex($methods, string $rex, callable $cb): void
+    {
         if (empty($methods)) {
             throw new \InvalidArgumentException("method cannot be empty..");
         }
@@ -41,14 +47,12 @@ class ShittyRouter1
         if (empty($methods)) {
             throw new \InvalidArgumentException("empty methods");
         }
-        $rex = '#^' . $rex . '$#';
         $this->routes[] = [
-                self::ROUTE_INDEX_METHODS => $methods,
-                self::ROUTE_INDEX_REX => $rex,
-                self::ROUTE_INDEX_CALLBACK => $cb
+            self::ROUTE_INDEX_METHODS => $methods,
+            self::ROUTE_INDEX_REX => $rex,
+            self::ROUTE_INDEX_CALLBACK => $cb
         ];
     }
-
     public function set404(callable $cb): void
     {
         $this->not_found_cb = $cb;
