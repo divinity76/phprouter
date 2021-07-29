@@ -1,7 +1,8 @@
 <?php
 declare(strict_types = 1);
+namespace Divinity76\Phprouter;
 
-class ShittyRouter1
+class Phprouter
 {
 
     private const ROUTE_INDEX_METHODS = 0;

@@ -1,0 +1,15 @@
+{
+    "name": "divinity76/phprouter",
+    "description": "php router",
+    "keywords": ["router", "routing"],
+    "homepage": "https://github.com/divinity76/phprouter",
+    "type": "library",
+    "license": "Unlicense",
+    "require": {
+        "php": ">=7.0"
+    },
+    "autoload": {
+        "psr-4": {"Divinity76\\": "src/Divinity76/"}
+    }
+}
+
