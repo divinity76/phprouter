@@ -1,5 +1,7 @@
 <?php
-declare(strict_types = 1);
+
+declare(strict_types=1);
+
 namespace Divinity76\Phprouter;
 
 class Phprouter
@@ -40,7 +42,8 @@ class Phprouter
         if (empty($methods)) {
             throw new \InvalidArgumentException("method cannot be empty..");
         }
-        if (is_array($methods)) {} elseif (is_string($methods)) {
+        if (is_array($methods)) {
+        } elseif (is_string($methods)) {
             $methods = explode('|', $methods);
         } else {
             throw new \InvalidArgumentException("methods must be array or | separated string");
@@ -62,7 +65,7 @@ class Phprouter
     public function trigger404(): void
     {
         http_response_code(404);
-        if (! empty($this->not_found_cb)) {
+        if (!empty($this->not_found_cb)) {
             ($this->not_found_cb)();
         }
     }
@@ -83,16 +86,47 @@ class Phprouter
         $requestMethod = $this->getRequestMethod();
         $matches = [];
         foreach ($this->routes as $route) {
-            if (!in_array($requestMethod, $route[self::ROUTE_INDEX_METHODS], true)) {
-                continue;
-            }
-            if (preg_match($route[self::ROUTE_INDEX_REX], $requestUri, $matches)) {
-                unset($matches[0]); // contains $requestUri ..
+            if (
+                in_array($requestMethod, $route[self::ROUTE_INDEX_METHODS], true)
+                && preg_match($route[self::ROUTE_INDEX_REX], $requestUri, $matches)
+            ) {
+                if ($this->array_is_list_compat($matches)) {
+                    // list mode
+                    unset($matches[0]); // remove the full match
+                } else {
+                    // assoc mode, remove all integer keys..
+                    $i = 0;
+                    do {
+                        unset($matches[$i]);
+                        ++$i;
+                    } while (isset($matches[$i]));
+                }
                 http_response_code(200);
                 ($route[self::ROUTE_INDEX_CALLBACK])(...$matches);
                 return;
             }
         }
         $this->trigger404();
+    }
+    /**
+     * php < 8.1.0 compatibility for array_is_list
+     * 
+     * @param array $array
+     * @return bool
+     */
+    private static function array_is_list_compat(array $array): bool
+    {
+        if (PHP_VERSION_ID >= 80100) {
+            // PHP >= 8.1.0 has a native and faster array_is_list
+            return array_is_list($array);
+        }
+        $i = -1;
+        foreach ($array as $k => $_) {
+            ++$i;
+            if ($k !== $i) {
+                return false;
+            }
+        }
+        return true;
     }
 }
