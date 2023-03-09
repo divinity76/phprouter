@@ -102,6 +102,7 @@ class Phprouter
                     unset($matches[0]); // remove the full match
                 } else {
                     // assoc mode, remove all integer keys..
+                    // todo: this can probably be optimized with array_splice
                     $i = 0;
                     do {
                         unset($matches[$i]);
