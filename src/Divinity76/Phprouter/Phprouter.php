@@ -13,6 +13,9 @@ class Phprouter
 
     private const ROUTE_INDEX_CALLBACK = 2;
 
+    /** @var bool */
+    public $ignoreGetParams = false;
+
     private $routes = [];
 
     private $not_found_cb = null;
@@ -72,7 +75,11 @@ class Phprouter
 
     public static function getRequestUri(): string
     {
-        return $_SERVER['REQUEST_URI'];
+        $ret = $_SERVER['REQUEST_URI'];
+        if($this->ignoreGetParams && ($pos = strpos($ret, '?')) !== false) {
+            return substr($ret, 0, $pos);
+        }
+        return $ret;
     }
 
     public static function getRequestMethod(): string
