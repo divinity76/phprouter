@@ -73,7 +73,7 @@ class Phprouter
         }
     }
 
-    public static function getRequestUri(): string
+    public function getRequestUri(): string
     {
         $ret = $_SERVER['REQUEST_URI'];
         if($this->ignoreGetParams && ($pos = strpos($ret, '?')) !== false) {
