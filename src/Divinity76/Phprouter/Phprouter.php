@@ -65,11 +65,11 @@ class Phprouter
         $this->not_found_cb = $cb;
     }
 
-    public function trigger404(): void
+    public function trigger404(...$args): void
     {
         http_response_code(404);
         if (!empty($this->not_found_cb)) {
-            ($this->not_found_cb)();
+            ($this->not_found_cb)(...$args);
         }
     }
 
