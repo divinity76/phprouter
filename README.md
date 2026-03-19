@@ -24,7 +24,7 @@ $router->post("/test",function(){
 });
 $router->match("PATCH","/user/(\d+)/([^\\/])?",function(string $user_id, string $user_name_supplied){
     echo "you accessed user #".htmlentities($user_id). 
-      ", you think his name is ".htmlentities($user_name)."...");
+      ", you think his name is ".htmlentities($user_name_supplied)."...");
 });
 $router->set404(function(){
     echo "404 not found: ".htmlentities($_SERVER['REQUEST_URI']);
