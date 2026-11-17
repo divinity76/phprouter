@@ -1,4 +1,6 @@
 # phprouter
+[![tests](https://github.com/divinity76/phprouter/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/divinity76/phprouter/actions/workflows/tests.yml)
+
 php router
 api inspried by https://github.com/bramus/router
 but this router is not affected by https://github.com/bramus/router/issues/137 ... which is why i made this router
