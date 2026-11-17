@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Divinity76\Phprouter;
 
+/**
+ * a small regex router.
+ *
+ * routes are checked in registration order and the first match wins, so
+ * register the specific ones before the catch-alls.
+ */
 class Phprouter
 {
 
@@ -15,7 +21,7 @@ class Phprouter
 
     private const ROUTE_INDEX_ANCHORED = 3;
 
-    private $routes = [];
+    private array $routes = [];
 
     private $not_found_cb = null;
 
@@ -33,14 +39,21 @@ class Phprouter
         ], $rex, $cb);
     }
 
-    public function match($methods, string $rex, callable $cb): void
+    public function match(array|string $methods, string $rex, callable $cb): void
     {
+        // pcre only accepts leading verbs like (*UTF) or (*UCP) at the very
+        // start of a pattern, so hoist them in front of the anchors.
+        $verbs = '';
+        if (preg_match('/\A(?:\(\*[A-Z_0-9=]+\))+/', $rex, $m)) {
+            $verbs = $m[0];
+            $rex = substr($rex, strlen($verbs));
+        }
         // \x01 as the delimiter. '#' would collide with regex syntax that can
         // appear inside a route, such as (?#comment) or a (?x) mode comment;
         // a request path itself can never contain a raw '#'.
         // (?:...) keeps a top-level alternation inside the anchors.
         // \z instead of $ because $ also matches before a trailing newline.
-        $rex = "\x01^(?:" . $rex . ")\z\x01";
+        $rex = "\x01" . $verbs . "^(?:" . $rex . ")\z\x01";
         $this->addRoute($methods, $rex, $cb, true);
     }
 
@@ -49,24 +62,18 @@ class Phprouter
      * whole-path enforcement. use this when you need a construct the anchored
      * form rejects, such as \K.
      */
-    public function matchRawRex($methods, string $rex, callable $cb): void
+    public function matchRawRex(array|string $methods, string $rex, callable $cb): void
     {
         $this->addRoute($methods, $rex, $cb, false);
     }
 
-    private function addRoute($methods, string $rex, callable $cb, bool $anchored): void
+    private function addRoute(array|string $methods, string $rex, callable $cb, bool $anchored): void
     {
-        if (empty($methods)) {
-            throw new \InvalidArgumentException("method cannot be empty..");
+        if (is_string($methods)) {
+            $methods = $methods === '' ? [] : explode('|', $methods);
         }
-        if (is_array($methods)) {
-        } elseif (is_string($methods)) {
-            $methods = explode('|', $methods);
-        } else {
-            throw new \InvalidArgumentException("methods must be array or | separated string");
-        }
-        if (empty($methods)) {
-            throw new \InvalidArgumentException("empty methods");
+        if ($methods === []) {
+            throw new \InvalidArgumentException("methods cannot be empty");
         }
         // fail at registration, not on a request, when the regex is broken.
         // the pcre warning is deliberately not suppressed: it names the
@@ -91,7 +98,7 @@ class Phprouter
     public function trigger404(...$args): void
     {
         http_response_code(404);
-        if (!empty($this->not_found_cb)) {
+        if ($this->not_found_cb !== null) {
             ($this->not_found_cb)(...$args);
         }
     }
@@ -109,12 +116,16 @@ class Phprouter
      * byte-preserving contract, and it also accepts things that are not
      * ordinary request paths ('*', authority-form, relative targets).
      *
-     * returns '' when the target cannot be parsed at all; run() reports 400.
+     * returns '' when the target is empty or cannot be parsed; run() reports
+     * 400.
      */
     public function getRequestPath(): string
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        if ($uri !== '' && $uri[0] === '/') {
+        if ($uri === '') {
+            return '';
+        }
+        if ($uri[0] === '/') {
             // origin-form. the first '?' always starts the query string;
             // a '?' cannot appear unencoded in a path. nothing else is
             // stripped: in particular a '#' is kept as a literal byte, even
@@ -139,9 +150,10 @@ class Phprouter
 
     /**
      * dispatch the request and return the status the router decided on:
-     * 200 when a route matched, 404 when the 404 handler ran, 400 for a
-     * request target that could not be parsed (or a path that a route in
-     * utf-8 mode could not evaluate), 500 when pcre failed.
+     * 200 when a route matched, 404 when the 404 handler ran, 400 for an
+     * unusable request (empty target, missing method, target that could not be
+     * parsed, or a path a `u`-mode route could not decode), 500 when pcre
+     * failed.
      *
      * on a match the router sets 200 before invoking the handler, so a status
      * set before run() is overwritten; the handler can set its own afterwards.
@@ -152,9 +164,8 @@ class Phprouter
     {
         $requestPath = $this->getRequestPath();
         $requestMethod = $this->getRequestMethod();
-        if ($requestPath === '') {
-            // the request target could not be parsed. not a 404: we have no
-            // path to match, and the client sent something malformed.
+        if ($requestPath === '' || $requestMethod === '') {
+            // malformed request: no usable path or method.
             http_response_code(400);
             return 400;
         }
@@ -205,7 +216,8 @@ class Phprouter
      * the same route is discarded.
      *
      * a handler receiving named captures must declare every named group by the
-     * same name: php raises "Unknown named parameter" otherwise.
+     * same name: php raises "Unknown named parameter" otherwise. an optional
+     * group that did not participate is null, so type it `?string`.
      *
      * @param array $matches
      * @return array

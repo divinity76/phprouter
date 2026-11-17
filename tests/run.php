@@ -114,7 +114,7 @@ expect('real slash is a separator', 'GET', '/a/b', function ($r, &$o) {
 check('getRequestPath drops the query', pathOf('/a/b?c=d'), '/a/b');
 check('getRequestPath keeps // in the path', pathOf('//foo/bar?x=1'), '//foo/bar');
 check('getRequestPath on absolute-form', pathOf('http://kai.loltek.net/test?x=1'), '/test');
-check('getRequestPath on empty uri', pathOf(''), '/');
+check('getRequestPath on empty uri', pathOf(''), '');
 check('getRequestPath with no query', pathOf('/test'), '/test');
 check('getRequestPath keeps a raw # in origin-form', pathOf('/foo#frag'), '/foo#frag');
 check('absolute-form fragment is dropped by uri parsing', pathOf('http://h/foo#frag'), '/foo');
@@ -347,7 +347,7 @@ expect('404 handler with no parameters still works', 'GET', '/nope', function ($
 expect('empty router 404s', 'GET', '/', function () {
 }, false, [], 404);
 
-check('missing REQUEST_METHOD 404s', (function () {
+check('missing REQUEST_METHOD is 400', (function () {
     $_SERVER['REQUEST_URI'] = '/test';
     unset($_SERVER['REQUEST_METHOD']);
     $router = new Phprouter();
@@ -362,7 +362,35 @@ check('missing REQUEST_METHOD 404s', (function () {
         ob_end_clean();
     }
     return [$hit, $status];
-})(), [false, 404]);
+})(), [false, 400]);
+
+check('empty request target is 400', (function () {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REQUEST_URI'] = '';
+    $router = new Phprouter();
+    $router->get('/.*', function () {
+    });
+    ob_start();
+    try {
+        return $router->run();
+    } finally {
+        ob_end_clean();
+    }
+})(), 400);
+
+check('a leading (*UTF) verb is hoisted', (function () {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REQUEST_URI'] = '/héllo';
+    $router = new Phprouter();
+    $router->get('(*UTF)/\p{L}+', function () {
+    });
+    ob_start();
+    try {
+        return $router->run();
+    } finally {
+        ob_end_clean();
+    }
+})(), 200);
 
 // --- the return value and the response code agree -------------------------
 

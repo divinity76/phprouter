@@ -42,6 +42,8 @@ $router->run();
 routes are regular expressions, matched against the request **path**: the
 request target with the query string removed. `GET /test?x=1` matches the route
 `/test`; the query string is still available to the handler through `$_GET`.
+the first route that matches wins, so register specific routes before
+catch-alls.
 
 for origin-form targets (the practically universal case) the path is **not
 normalized and not decoded**. `%2F` stays `%2F`, a trailing `/` stays
@@ -70,18 +72,25 @@ a route using `(?x)` must not end with a `#` comment: the wrapper's closing
 `)` would be swallowed by the comment and registration would throw. put a
 newline before the end, or use `matchRawRex()`.
 
+leading pcre verbs are hoisted in front of the anchors, since pcre only accepts
+them at the very start of a pattern. that is how you get unicode-aware matching
+through `get()`/`match()`: `$router->get('(*UTF)/\p{L}+', ...)`, or `(*UCP)` to
+also make `\w`, `\d` and `\s` unicode-aware.
+
 if pcre refuses to evaluate a route (the backtrack or jit limit), `run()` sets
-500 and returns. a path that a `u`-mode route cannot decode as utf-8 is 400
-instead; a byte-oriented route accepts the same bytes and matches normally. in
-either error case the request does not fall through to a later route and the
-404 handler is not called: this is a bug in a route rather than a request that
-matched nothing, so the application's own error handling is expected to take
-over. note that a limit failure produces no php warning of its own.
+500 and returns. a path whose bytes a `u`-mode route cannot decode is 400
+instead; that needs the `u` modifier, so it applies to `matchRawRex()` patterns
+rather than to `(*UTF)` routes, and a byte-oriented route accepts those bytes
+and matches normally. in either error case the request does not fall through to
+a later route and the 404 handler is not called: this is a bug in a route rather
+than a request that matched nothing, so the application's own error handling is
+expected to take over. note that a limit failure produces no php warning of its
+own.
 
 `run()` returns the status it decided on: `200` when a route matched, `404`
-when the 404 handler ran, `400` when the request target could not be parsed (or
-a `u`-mode route could not decode the path), `500` when pcre failed. so if you
-want to handle the error cases yourself:
+when the 404 handler ran, `400` for an unusable request (empty target, missing
+method, unparseable target, or a path a `u`-mode route could not decode), `500`
+when pcre failed. so if you want to handle the error cases yourself:
 
 ```
 $status = $router->run();
@@ -127,6 +136,7 @@ same route are discarded. php cannot unpack the mixed result anyway, since
   registration instead of silently 404ing on every request.
 - if pcre fails on a request, the response is 500 (or 400 for invalid utf-8)
   rather than 404, and the request does not fall through to a broader route.
+- an empty request target or a missing request method is now 400, not 404.
 - `run()` now returns the status it decided on instead of `void`.
 - the 404 handler receives `(string $path, string $method)`.
 - php 8.2 is required.
