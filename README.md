@@ -38,9 +38,8 @@ $router->run();
 # matching
 
 routes are regular expressions, matched against the request **path**: the
-request target with the query string and fragment removed. `GET /test?x=1`
-matches the route `/test`; the query string is still available to the handler
-through `$_GET`.
+request target with the query string removed. `GET /test?x=1` matches the route
+`/test`; the query string is still available to the handler through `$_GET`.
 
 the path is **not normalized and not decoded**. `%2F` stays `%2F`, a trailing
 `/` stays significant, and `/foo` and `/foo%2F` are different paths. that is the
@@ -85,8 +84,8 @@ declare every group by the same name, or php raises "Unknown named parameter".
   into that. delete any line setting it. if you matched query strings in your
   route regexes, read `$_GET` in the handler instead, or match on
   `getRequestUri()` yourself.
-- routes now also strip the fragment, and a route that matches only part of the
-  path no longer matches.
+- routes now require a whole-path match, and a route that matches only part of
+  the path no longer matches.
 - a route with a broken regex throws `InvalidArgumentException` at
   registration instead of silently 404ing on every request.
 - the 404 handler receives `(string $path, string $method)`.

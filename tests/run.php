@@ -123,8 +123,8 @@ check('getRequestPath keeps // in the path', pathOf('//foo/bar?x=1'), '//foo/bar
 check('getRequestPath on absolute-form', pathOf('http://kai.loltek.net/test?x=1'), '/test');
 check('getRequestPath on empty uri', pathOf(''), '/');
 check('getRequestPath with no query', pathOf('/test'), '/test');
-check('getRequestPath drops the fragment', pathOf('/foo#frag'), '/foo');
-check('getRequestPath drops fragment on absolute-form', pathOf('http://h/foo#frag'), '/foo');
+check('getRequestPath keeps a raw # in origin-form', pathOf('/foo#frag'), '/foo#frag');
+check('absolute-form fragment is dropped by uri parsing', pathOf('http://h/foo#frag'), '/foo');
 check('getRequestPath ? before #', pathOf('/a?b#c'), '/a');
 check('getRequestPath rejects unparseable target', pathOf('http:///admin'), '');
 
@@ -161,7 +161,7 @@ expect('matchRawRex is a raw escape hatch (\\K)', 'GET', '/foobar', function ($r
     });
 }, true, ['bar'], 200);
 
-// --- # in a route is not a delimiter --------------------------------------
+// --- # is regex syntax, not a delimiter -----------------------------------
 
 expect('# inside (?#comment) works', 'GET', '/foo', function ($r) {
     $r->get('/foo(?#not a delimiter)', function () {

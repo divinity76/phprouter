@@ -35,8 +35,9 @@ class Phprouter
 
     public function match($methods, string $rex, callable $cb): void
     {
-        // \x01 as the delimiter, because '#' can legitimately appear inside a
-        // route: [#], (?#comment), or a (?x) mode comment.
+        // \x01 as the delimiter. '#' would collide with regex syntax that can
+        // appear inside a route, such as (?#comment) or a (?x) mode comment;
+        // a request path itself can never contain a raw '#'.
         // (?:...) keeps a top-level alternation inside the anchors.
         // \z instead of $ because $ also matches before a trailing newline.
         $rex = "\x01^(?:" . $rex . ")\z\x01";
@@ -102,9 +103,10 @@ class Phprouter
     }
 
     /**
-     * the request path: the request target with the query string and fragment
-     * removed. this is what routes are matched against, and it is returned
-     * exactly as sent: nothing is percent-decoded, so %2F stays %2F.
+     * the request path: the request target with the query string removed.
+     * this is what routes are matched against, and it is returned exactly as
+     * sent: nothing is percent-decoded, so %2F stays %2F, and no other byte is
+     * touched either.
      *
      * returns '' when the request target cannot be parsed at all; run() treats
      * that as a 404.
@@ -113,11 +115,12 @@ class Phprouter
     {
         $uri = $this->getRequestUri();
         if ($uri !== '' && $uri[0] === '/') {
-            // origin-form. '?' starts the query string and '#' would start a
-            // fragment (which a conforming client never sends); neither can
-            // appear unencoded in a path.
-            $end = strcspn($uri, '?#');
-            return $end === strlen($uri) ? $uri : substr($uri, 0, $end);
+            // origin-form. the first '?' always starts the query string;
+            // a '?' cannot appear unencoded in a path. nothing else is
+            // stripped: in particular a '#' is kept as a literal byte, even
+            // though a conforming client never sends one.
+            $pos = strpos($uri, '?');
+            return $pos === false ? $uri : substr($uri, 0, $pos);
         }
         // absolute-form (proxy-style requests) and anything else.
         // parse_url() must not see an origin-form path: it would read a
