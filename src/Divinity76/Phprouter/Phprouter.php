@@ -129,13 +129,25 @@ class Phprouter
         return $_SERVER['REQUEST_METHOD'] ?? '';
     }
 
-    public function run(): void
+    /**
+     * dispatch the request and return the status the router decided on:
+     * 200 when a route matched, 404 when the 404 handler ran, 400 for a
+     * request target that could not be parsed (or invalid utf-8), 500 when
+     * pcre failed.
+     *
+     * note that a handler can change the actual response code afterwards; the
+     * return value is the router's decision, not necessarily what ends up in
+     * the response.
+     */
+    public function run(): int
     {
         $requestPath = $this->getRequestPath();
         $requestMethod = $this->getRequestMethod();
         if ($requestPath === '') {
-            $this->trigger404($requestPath, $requestMethod);
-            return;
+            // the request target could not be parsed. not a 404: we have no
+            // path to match, and the client sent something malformed.
+            http_response_code(400);
+            return 400;
         }
         $matches = [];
         foreach ($this->routes as $route) {
@@ -149,8 +161,9 @@ class Phprouter
                 // either way this is not a 404: we do not know whether the
                 // route would have matched, and it must not fall through to a
                 // broader route.
-                http_response_code(preg_last_error() === PREG_BAD_UTF8_ERROR ? 400 : 500);
-                return;
+                $status = preg_last_error() === PREG_BAD_UTF8_ERROR ? 400 : 500;
+                http_response_code($status);
+                return $status;
             }
             if ($result !== 1) {
                 continue;
@@ -163,9 +176,10 @@ class Phprouter
             }
             http_response_code(200);
             ($route[self::ROUTE_INDEX_CALLBACK])(...self::buildArguments($matches));
-            return;
+            return 200;
         }
         $this->trigger404($requestPath, $requestMethod);
+        return 404;
     }
 
     /**

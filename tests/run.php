@@ -44,14 +44,12 @@ function request(string $method, string $uri, callable $register): array
     });
     ob_start();
     try {
-        $router->run();
+        $status = $router->run();
     } finally {
         ob_end_clean();
     }
-    $result['status'] = http_response_code();
-    if ($result['hit'] !== '404') {
-        $result['hit'] = true;
-    }
+    $result['status'] = $status;
+    $result['hit'] = $status === 200 ? true : ($result['hit'] === '404' ? '404' : false);
     return $result;
 }
 
@@ -197,11 +195,10 @@ check('bad utf-8 in the path is 400', (function () {
     });
     ob_start();
     try {
-        $router->run();
+        return $router->run();
     } finally {
         ob_end_clean();
     }
-    return http_response_code();
 })(), 400);
 
 check('a pcre limit is 500, not 404', (function () {
@@ -216,15 +213,31 @@ check('a pcre limit is 500, not 404', (function () {
         });
         ob_start();
         try {
-            $router->run();
+            return $router->run();
         } finally {
             ob_end_clean();
         }
-        return http_response_code();
     } finally {
         ini_set('pcre.backtrack_limit', (string) $old);
     }
 })(), 500);
+
+check('an unparseable request target is 400', (function () {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REQUEST_URI'] = 'http:///admin';
+    $router = new Phprouter();
+    $router->get('/.*', function () {
+    });
+    $router->set404(function () {
+        return 'unexpected 404';
+    });
+    ob_start();
+    try {
+        return $router->run();
+    } finally {
+        ob_end_clean();
+    }
+})(), 400);
 
 // --- positional captures --------------------------------------------------
 
@@ -330,12 +343,39 @@ check('missing REQUEST_METHOD 404s', (function () {
     });
     ob_start();
     try {
-        $router->run();
+        $status = $router->run();
     } finally {
         ob_end_clean();
     }
-    return [$hit, http_response_code()];
+    return [$hit, $status];
 })(), [false, 404]);
+
+// --- the return value and the response code agree -------------------------
+
+check('http status matches the run() return value', (function () {
+    $seen = [];
+    foreach ([
+        ['GET', '/hit', 200],
+        ['GET', '/miss', 404],
+        ['GET', 'http:///bad', 400],
+    ] as [$method, $uri, $expected]) {
+        $_SERVER['REQUEST_METHOD'] = $method;
+        $_SERVER['REQUEST_URI'] = $uri;
+        $router = new Phprouter();
+        $router->get('/hit', function () {
+        });
+        $router->set404(function () {
+        });
+        ob_start();
+        try {
+            $returned = $router->run();
+        } finally {
+            ob_end_clean();
+        }
+        $seen[] = [$expected, $returned, http_response_code()];
+    }
+    return $seen;
+})(), [[200, 200, 200], [404, 404, 404], [400, 400, 400]]);
 
 echo "\n$passes passed, " . count($failures) . " failed\n";
 foreach ($failures as $failure) {

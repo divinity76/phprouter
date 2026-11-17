@@ -71,18 +71,20 @@ not call the 404 handler: this is a bug in a route rather than a request that
 matched nothing, so the application's own error handling is expected to take
 over. note that a limit failure produces no php warning of its own.
 
-if you do want to handle those yourself, check the status after `run()`:
+`run()` returns the status it decided on: `200` when a route matched, `404`
+when the 404 handler ran, `400` when the request target could not be parsed (or
+invalid utf-8 was sent), `500` when pcre failed. so if you want to handle the
+error cases yourself:
 
 ```
-$router->run();
-$status = http_response_code();
+$status = $router->run();
 if ($status === 400 || $status === 500) {
     // your own error page
 }
 ```
 
-this works as long as nothing has been written to the response before `run()`;
-once headers are sent the status can no longer be changed.
+that is the router's decision, not necessarily the final response code: a
+handler is free to set something else after a match.
 
 capture groups are passed to the handler as arguments:
 
@@ -113,5 +115,6 @@ declare every group by the same name, or php raises "Unknown named parameter".
   registration instead of silently 404ing on every request.
 - if pcre fails on a request, the response is 500 (or 400 for invalid utf-8)
   rather than 404, and the request does not fall through to a broader route.
+- `run()` now returns the status it decided on instead of `void`.
 - the 404 handler receives `(string $path, string $method)`.
 - php 8.2 is required.
