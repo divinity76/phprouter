@@ -64,6 +64,13 @@ the route only matches when the reported match covers the entire path. use
 `matchRawRex()` for anything like that. it takes the pattern exactly as given,
 with your own delimiters and anchors, and does not require whole-path coverage.
 
+if pcre refuses to evaluate a route (the backtrack or jit limit, or invalid
+utf-8 in the path under a `u` route), `run()` sets 500 — or 400 for the invalid
+utf-8 case — and returns. it does not fall through to a later route, and it does
+not call the 404 handler: this is a bug in a route rather than a request that
+matched nothing, so the application's own error handling is expected to take
+over. note that a limit failure produces no php warning of its own.
+
 capture groups are passed to the handler as arguments:
 
 ```
