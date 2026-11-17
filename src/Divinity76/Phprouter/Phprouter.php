@@ -213,7 +213,12 @@ class Phprouter
     private static function buildArguments(array $matches): array
     {
         unset($matches[0]); // the full match
-        $named = array_filter($matches, is_string(...), ARRAY_FILTER_USE_KEY);
+        $named = [];
+        foreach ($matches as $key => $value) {
+            if (is_string($key)) {
+                $named[$key] = $value;
+            }
+        }
         return $named ?: $matches;
     }
 }
