@@ -61,7 +61,7 @@ class Phprouter
         }
         if (is_array($methods)) {
         } elseif (is_string($methods)) {
-            $methods = array_map(trim(...), explode('|', $methods));
+            $methods = explode('|', $methods);
         } else {
             throw new \InvalidArgumentException("methods must be array or | separated string");
         }
@@ -69,7 +69,7 @@ class Phprouter
             throw new \InvalidArgumentException("empty methods");
         }
         // fail at registration, not on a request, when the regex is broken.
-        if (@preg_match($rex, '') === false) {
+        if (preg_match($rex, '') === false) {
             throw new \InvalidArgumentException(
                 "invalid route regex (" . preg_last_error_msg() . "): " . $rex
             );
@@ -95,25 +95,17 @@ class Phprouter
     }
 
     /**
-     * the raw request target, query string included.
-     */
-    public function getRequestUri(): string
-    {
-        return $_SERVER['REQUEST_URI'] ?? '/';
-    }
-
-    /**
      * the request path: the request target with the query string removed.
      * this is what routes are matched against, and it is returned exactly as
      * sent: nothing is percent-decoded, so %2F stays %2F, and no other byte is
-     * touched either.
+     * touched either. the raw target is still in $_SERVER['REQUEST_URI'].
      *
      * returns '' when the request target cannot be parsed at all; run() treats
      * that as a 404.
      */
     public function getRequestPath(): string
     {
-        $uri = $this->getRequestUri();
+        $uri = $_SERVER['REQUEST_URI'] ?? '/';
         if ($uri !== '' && $uri[0] === '/') {
             // origin-form. the first '?' always starts the query string;
             // a '?' cannot appear unencoded in a path. nothing else is
@@ -152,10 +144,12 @@ class Phprouter
             }
             $result = preg_match($route[self::ROUTE_INDEX_REX], $requestPath, $matches, PREG_UNMATCHED_AS_NULL);
             if ($result === false) {
-                // a pcre limit was hit (the regex itself was checked at
-                // registration). do not let the request fall through to a
-                // later, broader route because of it.
-                $this->trigger404($requestPath, $requestMethod);
+                // pcre refused to evaluate the route. invalid utf-8 in the
+                // path is the client's fault; the limit errors are ours.
+                // either way this is not a 404: we do not know whether the
+                // route would have matched, and it must not fall through to a
+                // broader route.
+                http_response_code(preg_last_error() === PREG_BAD_UTF8_ERROR ? 400 : 500);
                 return;
             }
             if ($result !== 1) {

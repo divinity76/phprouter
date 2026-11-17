@@ -111,12 +111,7 @@ expect('real slash is a separator', 'GET', '/a/b', function ($r, &$o) {
     });
 }, true, ['b'], 200);
 
-// --- request target accessors --------------------------------------------
-
-check('getRequestUri keeps the query', (function () {
-    $_SERVER['REQUEST_URI'] = '/a/b?c=d';
-    return (new Phprouter())->getRequestUri();
-})(), '/a/b?c=d');
+// --- request target accessor ---------------------------------------------
 
 check('getRequestPath drops the query', pathOf('/a/b?c=d'), '/a/b');
 check('getRequestPath keeps // in the path', pathOf('//foo/bar?x=1'), '//foo/bar');
@@ -172,14 +167,64 @@ expect('# inside (?#comment) works', 'GET', '/foo', function ($r) {
 
 check('invalid regex throws at registration', (function () {
     $router = new Phprouter();
+    // the compile warning is part of the failure mode; swallow it here so the
+    // test output stays readable.
+    set_error_handler(static function (): bool {
+        return true;
+    });
     try {
-        $router->get('/admin(', function () {
-        });
-        return 'no exception';
-    } catch (\InvalidArgumentException $e) {
-        return 'InvalidArgumentException';
+        try {
+            $router->get('/admin(', function () {
+            });
+            return 'no exception';
+        } catch (\InvalidArgumentException $e) {
+            return 'InvalidArgumentException';
+        }
+    } finally {
+        restore_error_handler();
     }
 })(), 'InvalidArgumentException');
+
+// --- a pcre failure is not a 404 ------------------------------------------
+
+check('bad utf-8 in the path is 400', (function () {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REQUEST_URI'] = "/\xFF";
+    $router = new Phprouter();
+    $router->matchRawRex('GET', '/.*/u', function () {
+    });
+    $router->set404(function () {
+    });
+    ob_start();
+    try {
+        $router->run();
+    } finally {
+        ob_end_clean();
+    }
+    return http_response_code();
+})(), 400);
+
+check('a pcre limit is 500, not 404', (function () {
+    $old = ini_set('pcre.backtrack_limit', '1');
+    try {
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_URI'] = '/' . str_repeat('ab', 2000) . '!';
+        $router = new Phprouter();
+        $router->matchRawRex('GET', '/(a+)+b/', function () {
+        });
+        $router->set404(function () {
+        });
+        ob_start();
+        try {
+            $router->run();
+        } finally {
+            ob_end_clean();
+        }
+        return http_response_code();
+    } finally {
+        ini_set('pcre.backtrack_limit', (string) $old);
+    }
+})(), 500);
 
 // --- positional captures --------------------------------------------------
 
@@ -247,11 +292,6 @@ expect('method mismatch is 404', 'POST', '/test', function ($r) {
 
 expect('pipe separated methods', 'PATCH', '/test', function ($r) {
     $r->match('GET|PATCH', '/test', function () {
-    });
-}, true, [], 200);
-
-expect('pipe separated methods are trimmed', 'POST', '/test', function ($r) {
-    $r->match('GET | POST', '/test', function () {
     });
 }, true, [], 200);
 

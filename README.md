@@ -47,9 +47,9 @@ the path is **not normalized and not decoded**. `%2F` stays `%2F`, a trailing
 `/` stays significant, and `/foo` and `/foo%2F` are different paths. that is the
 difference from bramus/router, which trims them before matching.
 
-`getRequestUri()` returns the raw request target (query included) if you need
-it, `getRequestPath()` returns the path that routes are matched against. the
-404 handler receives the path and the method.
+`getRequestPath()` returns the path that routes are matched against. there is no
+accessor for the raw target: read `$_SERVER['REQUEST_URI']` directly if you need
+the query string. the 404 handler receives the path and the method.
 
 routes are anchored for you: a route is wrapped as `\x01^(?:...)\z\x01`, so it
 has to match the whole path and nothing else. `\z` is used rather than `$`,
@@ -84,11 +84,14 @@ declare every group by the same name, or php raises "Unknown named parameter".
 - `$ignoreGetParams` is gone. the query string was never part of the path, so
   it is now always removed before matching; the flag only ever existed to opt
   into that. delete any line setting it. if you matched query strings in your
-  route regexes, read `$_GET` in the handler instead, or match on
-  `getRequestUri()` yourself.
+  route regexes, read `$_GET` in the handler instead.
+- `getRequestUri()` is gone; `getRequestPath()` returns the path that is
+  matched. read `$_SERVER['REQUEST_URI']` if you need the raw target.
 - routes now require a whole-path match, and a route that matches only part of
   the path no longer matches.
 - a route with a broken regex throws `InvalidArgumentException` at
   registration instead of silently 404ing on every request.
+- if pcre fails on a request, the response is 500 (or 400 for invalid utf-8)
+  rather than 404, and the request does not fall through to a broader route.
 - the 404 handler receives `(string $path, string $method)`.
 - php 8.2 is required.
