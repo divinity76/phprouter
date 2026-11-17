@@ -201,6 +201,20 @@ check('bad utf-8 in the path is 400', (function () {
     }
 })(), 400);
 
+check('a byte-oriented route accepts invalid utf-8', (function () {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REQUEST_URI'] = "/\xFF";
+    $router = new Phprouter();
+    $router->get('/.*', function () {
+    });
+    ob_start();
+    try {
+        return $router->run();
+    } finally {
+        ob_end_clean();
+    }
+})(), 200);
+
 check('a pcre limit is 500, not 404', (function () {
     $old = ini_set('pcre.backtrack_limit', '1');
     try {

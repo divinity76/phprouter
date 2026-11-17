@@ -69,6 +69,8 @@ class Phprouter
             throw new \InvalidArgumentException("empty methods");
         }
         // fail at registration, not on a request, when the regex is broken.
+        // the pcre warning is deliberately not suppressed: it names the
+        // offending pattern, and the exception follows it.
         if (preg_match($rex, '') === false) {
             throw new \InvalidArgumentException(
                 "invalid route regex (" . preg_last_error_msg() . "): " . $rex
@@ -96,12 +98,18 @@ class Phprouter
 
     /**
      * the request path: the request target with the query string removed.
-     * this is what routes are matched against, and it is returned exactly as
-     * sent: nothing is percent-decoded, so %2F stays %2F, and no other byte is
-     * touched either. the raw target is still in $_SERVER['REQUEST_URI'].
+     * this is what routes are matched against.
      *
-     * returns '' when the request target cannot be parsed at all; run() treats
-     * that as a 404.
+     * for origin-form targets (the normal case) the path is returned exactly
+     * as sent: nothing is percent-decoded, so %2F stays %2F, and no other byte
+     * is touched either. the raw target is still in $_SERVER['REQUEST_URI'].
+     *
+     * absolute-form targets (proxy-style) and other non-origin forms go
+     * through parse_url(), which reports the path per uri rules: that is not a
+     * byte-preserving contract, and it also accepts things that are not
+     * ordinary request paths ('*', authority-form, relative targets).
+     *
+     * returns '' when the target cannot be parsed at all; run() reports 400.
      */
     public function getRequestPath(): string
     {
@@ -132,12 +140,13 @@ class Phprouter
     /**
      * dispatch the request and return the status the router decided on:
      * 200 when a route matched, 404 when the 404 handler ran, 400 for a
-     * request target that could not be parsed (or invalid utf-8), 500 when
-     * pcre failed.
+     * request target that could not be parsed (or a path that a route in
+     * utf-8 mode could not evaluate), 500 when pcre failed.
      *
-     * note that a handler can change the actual response code afterwards; the
-     * return value is the router's decision, not necessarily what ends up in
-     * the response.
+     * on a match the router sets 200 before invoking the handler, so a status
+     * set before run() is overwritten; the handler can set its own afterwards.
+     * the return value is the router's decision, not necessarily what ends up
+     * in the response.
      */
     public function run(): int
     {
@@ -185,10 +194,15 @@ class Phprouter
     /**
      * turn a preg_match() result into the arguments for the route callback.
      *
-     * named captures (?<name>..) become named arguments, positional captures
-     * (..) become positional arguments. preg_match() reports a named group
-     * under both its name and its index, so the integer keys are dropped when
-     * the route uses names; php cannot unpack a mix of the two anyway.
+     * positional captures (..) become positional arguments, named captures
+     * (?<name>..) become named arguments.
+     *
+     * a route uses one style or the other. preg_match() reports a named group
+     * under both its name and its index, and a mixed result cannot be unpacked
+     * at all: the numeric duplicates collide with the named parameters, and
+     * positional entries would follow named ones. so when a route uses named
+     * groups, only the named captures are passed, and any unnamed capture in
+     * the same route is discarded.
      *
      * a handler receiving named captures must declare every named group by the
      * same name: php raises "Unknown named parameter" otherwise.

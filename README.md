@@ -43,9 +43,11 @@ routes are regular expressions, matched against the request **path**: the
 request target with the query string removed. `GET /test?x=1` matches the route
 `/test`; the query string is still available to the handler through `$_GET`.
 
-the path is **not normalized and not decoded**. `%2F` stays `%2F`, a trailing
-`/` stays significant, and `/foo` and `/foo%2F` are different paths. that is the
-difference from bramus/router, which trims them before matching.
+for origin-form targets (the practically universal case) the path is **not
+normalized and not decoded**. `%2F` stays `%2F`, a trailing `/` stays
+significant, and `/foo` and `/foo%2F` are different paths. that is the
+difference from bramus/router, which trims them before matching. absolute-form
+targets (proxy-style) are parsed as uris instead, and are not byte-preserving.
 
 `getRequestPath()` returns the path that routes are matched against. there is no
 accessor for the raw target: read `$_SERVER['REQUEST_URI']` directly if you need
@@ -64,17 +66,22 @@ the route only matches when the reported match covers the entire path. use
 `matchRawRex()` for anything like that. it takes the pattern exactly as given,
 with your own delimiters and anchors, and does not require whole-path coverage.
 
-if pcre refuses to evaluate a route (the backtrack or jit limit, or invalid
-utf-8 in the path under a `u` route), `run()` sets 500 — or 400 for the invalid
-utf-8 case — and returns. it does not fall through to a later route, and it does
-not call the 404 handler: this is a bug in a route rather than a request that
+a route using `(?x)` must not end with a `#` comment: the wrapper's closing
+`)` would be swallowed by the comment and registration would throw. put a
+newline before the end, or use `matchRawRex()`.
+
+if pcre refuses to evaluate a route (the backtrack or jit limit), `run()` sets
+500 and returns. a path that a `u`-mode route cannot decode as utf-8 is 400
+instead; a byte-oriented route accepts the same bytes and matches normally. in
+either error case the request does not fall through to a later route and the
+404 handler is not called: this is a bug in a route rather than a request that
 matched nothing, so the application's own error handling is expected to take
 over. note that a limit failure produces no php warning of its own.
 
 `run()` returns the status it decided on: `200` when a route matched, `404`
 when the 404 handler ran, `400` when the request target could not be parsed (or
-invalid utf-8 was sent), `500` when pcre failed. so if you want to handle the
-error cases yourself:
+a `u`-mode route could not decode the path), `500` when pcre failed. so if you
+want to handle the error cases yourself:
 
 ```
 $status = $router->run();
@@ -100,6 +107,11 @@ captures are always **strings**, and an optional group that did not participate
 is passed as `null`, so the handler always receives one argument per group.
 type them `string` / `?string`, not `int`. with named groups, the handler must
 declare every group by the same name, or php raises "Unknown named parameter".
+
+a route uses positional captures or named captures, not both: when it has any
+named group, only the named captures are passed and unnamed captures in the
+same route are discarded. php cannot unpack the mixed result anyway, since
+`preg_match()` reports a named group under both its name and its index.
 
 # upgrading from 1.x
 
