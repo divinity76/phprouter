@@ -71,6 +71,19 @@ not call the 404 handler: this is a bug in a route rather than a request that
 matched nothing, so the application's own error handling is expected to take
 over. note that a limit failure produces no php warning of its own.
 
+if you do want to handle those yourself, check the status after `run()`:
+
+```
+$router->run();
+$status = http_response_code();
+if ($status === 400 || $status === 500) {
+    // your own error page
+}
+```
+
+this works as long as nothing has been written to the response before `run()`;
+once headers are sent the status can no longer be changed.
+
 capture groups are passed to the handler as arguments:
 
 ```
