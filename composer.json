@@ -6,10 +6,13 @@
     "type": "library",
     "license": "Unlicense",
     "require": {
-        "php": ">=7.0"
+        "php": ">=8.2"
     },
     "autoload": {
         "psr-4": {"Divinity76\\": "src/Divinity76/"}
+    },
+    "scripts": {
+        "test": "php tests/run.php"
     }
 }
 
